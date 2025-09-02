@@ -12,7 +12,9 @@ class PressBackHandler extends RequestHandler {
   Future<AppiumResponse> handle(Request request) async {
     var sessionId = getSessionId(request);
 
-    await FlutterDriver.instance.tester.pageBack();
+    await TestAsyncUtils.guard(() async {
+      await FlutterDriver.instance.tester.pageBack();
+    });
     return AppiumResponse(sessionId, null);
   }
 }

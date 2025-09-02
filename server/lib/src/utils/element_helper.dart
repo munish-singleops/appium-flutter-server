@@ -24,8 +24,7 @@ typedef WaitPredicate = Future<bool> Function();
 
 class ElementHelper {
   static Future<Finder> findElement(Finder by, {String? contextId}) async {
-    List<Finder> elementList =
-        await findElements(by, contextId: contextId, evaluatePresence: true);
+    List<Finder> elementList = await findElements(by, contextId: contextId, evaluatePresence: true);
     log("Element found ${elementList.first}");
     return elementList.first;
   }
@@ -35,10 +34,8 @@ class ElementHelper {
     Finder finder = by;
 
     if (contextId != null) {
-      FlutterElement? parent = await FlutterDriver.instance
-          .getSessionOrThrow()!
-          .elementsCache
-          .get(contextId);
+      FlutterElement? parent =
+          await FlutterDriver.instance.getSessionOrThrow()!.elementsCache.get(contextId);
 
       finder = find.descendant(of: parent.by, matching: by);
     }
@@ -63,15 +60,19 @@ class ElementHelper {
   }
 
   static Future<void> click(FlutterElement element) async {
-    WidgetTester tester = _getTester();
-    await tester.tap(element.by);
-    await pumpAndTrySettle();
+    return TestAsyncUtils.guard(() async {
+      WidgetTester tester = _getTester();
+      await tester.tap(element.by);
+      await pumpAndTrySettle();
+    });
   }
 
   static Future<void> setText(FlutterElement element, String text) async {
-    WidgetTester tester = _getTester();
-    await tester.enterText(element.by, text);
-    await tester.pump(const Duration(milliseconds: 400));
+    return TestAsyncUtils.guard(() async {
+      WidgetTester tester = _getTester();
+      await tester.enterText(element.by, text);
+      await tester.pump(const Duration(milliseconds: 400));
+    });
   }
 
   static Future<void> gestureDoubleClick(GestureModel doubleClickModel) async {
@@ -90,24 +91,22 @@ class ElementHelper {
 
       if (element == null) {
         if (doubleClickModel.offset == null) {
-          throw ArgumentError(
-              "Double click offset coordinates must be provided "
+          throw ArgumentError("Double click offset coordinates must be provided "
               "if element is not set");
         }
 
-        await tester.tapAt(
-            Offset(doubleClickModel.offset!.x, doubleClickModel.offset!.y));
+        await tester.tapAt(Offset(doubleClickModel.offset!.x, doubleClickModel.offset!.y));
       } else {
         if (doubleClickModel.offset == null) {
           await doubleClick(element);
         } else {
-          Rect bounds = getElementBounds(element!.by);
+          Rect bounds = getElementBounds(element.by);
           log("Click by offset $bounds");
-          await tester.tapAt(Offset(bounds.left + doubleClickModel.offset!.x,
-              bounds.top + doubleClickModel.offset!.y));
+          await tester.tapAt(Offset(
+              bounds.left + doubleClickModel.offset!.x, bounds.top + doubleClickModel.offset!.y));
           await tester.pump(kDoubleTapMinTime);
-          await tester.tapAt(Offset(bounds.left + doubleClickModel.offset!.x,
-              bounds.top + doubleClickModel.offset!.y));
+          await tester.tapAt(Offset(
+              bounds.left + doubleClickModel.offset!.x, bounds.top + doubleClickModel.offset!.y));
           await pumpAndTrySettle();
         }
       }
@@ -115,11 +114,13 @@ class ElementHelper {
   }
 
   static Future<void> doubleClick(FlutterElement element) async {
-    WidgetTester tester = _getTester();
-    await tester.tap(element.by);
-    await tester.pump(kDoubleTapMinTime);
-    await tester.tap(element.by);
-    await pumpAndTrySettle();
+    return TestAsyncUtils.guard(() async {
+      WidgetTester tester = _getTester();
+      await tester.tap(element.by);
+      await tester.pump(kDoubleTapMinTime);
+      await tester.tap(element.by);
+      await pumpAndTrySettle();
+    });
   }
 
   static Future<void> longPress(GestureModel longPressModel) async {
@@ -141,16 +142,14 @@ class ElementHelper {
               "if element is not set");
         }
 
-        await tester.longPressAt(
-            Offset(longPressModel.offset!.x, longPressModel.offset!.y));
+        await tester.longPressAt(Offset(longPressModel.offset!.x, longPressModel.offset!.y));
       } else {
         if (longPressModel.offset == null) {
           await tester.longPress(element.by);
         } else {
-          Rect bounds = getElementBounds(element!.by);
+          Rect bounds = getElementBounds(element.by);
           log("Click by offset $bounds");
-          await tester.longPressAt(
-              Offset(longPressModel.offset!.x, longPressModel.offset!.y));
+          await tester.longPressAt(Offset(longPressModel.offset!.x, longPressModel.offset!.y));
           await pumpAndTrySettle();
         }
       }
@@ -158,108 +157,112 @@ class ElementHelper {
   }
 
   static Future<String> getText(FlutterElement element) async {
-    String getElementTextRecursively(dynamic element, {Set<dynamic>? visited}) {
-      visited ??= <dynamic>{};
+    return TestAsyncUtils.guard(() async {
+      String getElementTextRecursively(dynamic element, {Set<dynamic>? visited}) {
+        visited ??= <dynamic>{};
 
-      if (visited.contains(element)) {
-        return '';
-      }
-      visited.add(element);
-      final StringBuffer buffer = StringBuffer();
-
-      final widget = element.widget;
-      if (widget is Text) {
-        if (widget.data != null) {
-          buffer.write(widget.data);
-        } else if (widget.textSpan != null) {
-          buffer.write(widget.textSpan!.toPlainText());
+        if (visited.contains(element)) {
+          return '';
         }
-      } else if (widget is RichText) {
-        buffer.write(widget.text.toPlainText());
-      } else if (widget is EditableText) {
-        buffer.write(widget.controller.text);
-      } else if (widget is TextField) {
-        buffer.write(widget.controller?.value.text);
-      } else if (widget is ButtonStyleButton) {
-        buffer.write(getElementTextRecursively(widget.child, visited: visited));
+        visited.add(element);
+        final StringBuffer buffer = StringBuffer();
+
+        final widget = element.widget;
+        if (widget is Text) {
+          if (widget.data != null) {
+            buffer.write(widget.data);
+          } else if (widget.textSpan != null) {
+            buffer.write(widget.textSpan!.toPlainText());
+          }
+        } else if (widget is RichText) {
+          buffer.write(widget.text.toPlainText());
+        } else if (widget is EditableText) {
+          buffer.write(widget.controller.text);
+        } else if (widget is TextField) {
+          buffer.write(widget.controller?.value.text);
+        } else if (widget is ButtonStyleButton) {
+          buffer.write(getElementTextRecursively(widget.child, visited: visited));
+        }
+
+        if (element is RenderObjectElement) {
+          element.visitChildren((child) {
+            final childText = getElementTextRecursively(child, visited: visited);
+            buffer.write(childText);
+          });
+        }
+
+        return buffer.toString();
       }
 
-      if (element is RenderObjectElement) {
-        element.visitChildren((child) {
-          final childText = getElementTextRecursively(child, visited: visited);
-          buffer.write(childText);
-        });
-      }
-
-      return buffer.toString();
-    }
-
-    return getElementTextRecursively(element.by.evaluate().first);
+      return getElementTextRecursively(element.by.evaluate().first);
+    });
   }
 
-  static Future<dynamic> getAttribute(
-      FlutterElement element, String attribute) async {
-    if (NATIVE_ELEMENT_ATTRIBUTES.displayed.name == attribute) {
-      return element.by.evaluate().isNotEmpty;
-    } else if (NATIVE_ELEMENT_ATTRIBUTES.enabled.name == attribute) {
-      return _isElementEnabled(element);
-    } else if (NATIVE_ELEMENT_ATTRIBUTES.clickable.name == attribute) {
-      return _isElementClickable(element);
-    } else {
-      List<DiagnosticsNode> nodes = FlutterDriver.instance.tester
-          .widget(element.by)
-          .toDiagnosticsNode()
-          .getProperties();
-      List<DiagnosticsNode> data = [];
-      try {
-        data = FlutterDriver.instance.tester
-            .getSemantics(element.by)
-            .toDiagnosticsNode()
-            .getChildren()
-            .first
-            .getProperties();
-        FlutterDriver.instance.tester
-            .getSemantics(element.by)
-            .getSemanticsData()
-            .toDiagnosticsNode()
-            .getProperties()
-            .forEach((element) {
-          log("Semantics data : ${element.name} -> ${element.value}");
-        });
-      } catch (err) {
-        log(err);
-      }
-      data.addAll(nodes);
-      log("Available attributes for the element : ${element.by}");
-      for (DiagnosticsNode node in nodes) {
-        log("${node.name} -> ${node.value}");
-      }
-      log("Attribute in else block");
-      log(data);
-      try {
-        if (attribute == "all") {
-          Map<String, dynamic> values = {};
-          for (DiagnosticsNode node in data) {
-            log("${node.name.toString()} -> ${node.value.toString()}");
-            var value = node.name.toString();
-            values[value] = node.value.toString();
-          }
-          return values;
-        } else {
-          return data
-              .firstWhere((node) => node.name == attribute)
-              .value
-              .toString();
+  static Future<dynamic> getAttribute(FlutterElement element, String attribute) async {
+    return TestAsyncUtils.guard(() async {
+      if (NATIVE_ELEMENT_ATTRIBUTES.displayed.name == attribute) {
+        return element.by.evaluate().isNotEmpty;
+      } else if (NATIVE_ELEMENT_ATTRIBUTES.enabled.name == attribute) {
+        return _isElementEnabled(element);
+      } else if (NATIVE_ELEMENT_ATTRIBUTES.clickable.name == attribute) {
+        return _isElementClickable(element);
+      } else {
+        List<DiagnosticsNode> nodes =
+            FlutterDriver.instance.tester.widget(element.by).toDiagnosticsNode().getProperties();
+        List<DiagnosticsNode> data = [];
+        try {
+          data = FlutterDriver.instance.tester
+              .getSemantics(element.by)
+              .toDiagnosticsNode()
+              .getChildren()
+              .first
+              .getProperties();
+          FlutterDriver.instance.tester
+              .getSemantics(element.by)
+              .getSemanticsData()
+              .toDiagnosticsNode()
+              .getProperties()
+              .forEach((element) {
+            log("Semantics data : ${element.name} -> ${element.value}");
+          });
+        } catch (err) {
+          log(err);
         }
-      } catch (err) {
-        log(err);
-        return null;
+        data.addAll(nodes);
+        log("Available attributes for the element : ${element.by}");
+        for (DiagnosticsNode node in nodes) {
+          log("${node.name} -> ${node.value}");
+        }
+        log("Attribute in else block");
+        log(data);
+        try {
+          if (attribute == "all") {
+            Map<String, dynamic> values = {};
+            for (DiagnosticsNode node in data) {
+              log("${node.name.toString()} -> ${node.value.toString()}");
+              var value = node.name.toString();
+              values[value] = node.value.toString();
+            }
+            return values;
+          } else {
+            return data.firstWhere((node) => node.name == attribute).value.toString();
+          }
+        } catch (err) {
+          log(err);
+          return null;
+        }
       }
-    }
+    });
   }
 
   static WidgetTester _getTester() {
-    return FlutterDriver.instance.tester;
+    try {
+      return FlutterDriver.instance.tester;
+    } catch (e) {
+      throw FlutterAutomationException(
+          "Test operations cannot be performed outside of test context. "
+          "Ensure all operations are wrapped in TestAsyncUtils.guard()");
+    }
   }
 
   static Future<Finder> locateElement(FindElementModel model,
@@ -277,9 +280,8 @@ class ElementHelper {
       log('"method: $method, selector: $selector, contextId: $contextId');
     }
 
-    final Finder by = ElementLookupStrategy.values
-        .firstWhere((val) => val.name == method)
-        .toFinder(selector);
+    final Finder by =
+        ElementLookupStrategy.values.firstWhere((val) => val.name == method).toFinder(selector);
     if (evaluatePresence) {
       return await findElement(by, contextId: contextId);
     } else {
@@ -288,20 +290,22 @@ class ElementHelper {
   }
 
   static Rect getElementBounds(Finder by) {
+    TestAsyncUtils.guardSync();
     var tester = _getTester();
     return Rect.fromPoints(tester.getTopLeft(by), tester.getBottomRight(by));
   }
 
   static Size getElementSize(Finder by) {
+    TestAsyncUtils.guardSync();
     var tester = _getTester();
     return tester.getSize(by);
   }
 
   static String getElementName(Finder by) {
+    TestAsyncUtils.guardSync();
     var tester = _getTester();
     Element element = tester.element(by);
-    if (element is RenderObjectElement &&
-        element.renderObject.debugSemantics?.label != null) {
+    if (element is RenderObjectElement && element.renderObject.debugSemantics?.label != null) {
       final String? semanticsLabel = element.renderObject.debugSemantics?.label;
       if (semanticsLabel != null) {
         return semanticsLabel.toString();
@@ -311,6 +315,7 @@ class ElementHelper {
   }
 
   static DiagnosticsNode? _getElementPropertyNode(Finder by, String propertry) {
+    TestAsyncUtils.guardSync();
     try {
       return FlutterDriver.instance.tester
           .widget(by)
@@ -325,12 +330,10 @@ class ElementHelper {
 
   static dynamic _isElementEnabled(FlutterElement element) {
     String attribute = NATIVE_ELEMENT_ATTRIBUTES.enabled.name;
-    DiagnosticsNode? enabledProperty =
-        _getElementPropertyNode(element.by, attribute);
+    DiagnosticsNode? enabledProperty = _getElementPropertyNode(element.by, attribute);
     if (enabledProperty == null) {
       //For Button type elements, onPressed will be null if the element is disabled
-      DiagnosticsNode? onPressed =
-          _getElementPropertyNode(element.by, "onPressed");
+      DiagnosticsNode? onPressed = _getElementPropertyNode(element.by, "onPressed");
       return (onPressed == null || onPressed.value == null) ? "false" : "true";
     } else {
       return enabledProperty.value.toString();
@@ -345,8 +348,7 @@ class ElementHelper {
     TestAsyncUtils.guardSync();
     Finder finder = flutterElement.by;
     WidgetTester tester = _getTester();
-    IntegrationTestWidgetsFlutterBinding binding =
-        FlutterDriver.instance.binding;
+    IntegrationTestWidgetsFlutterBinding binding = FlutterDriver.instance.binding;
 
     final Iterable<Element> elements = finder.evaluate();
     final Element element = elements.single;
@@ -366,8 +368,7 @@ class ElementHelper {
     final FlutterView view = tester.viewOf(finder);
     final HitTestResult result = HitTestResult();
     binding.hitTestInView(result, location, view.viewId);
-    final bool found =
-        result.path.any((HitTestEntry entry) => entry.target == box);
+    final bool found = result.path.any((HitTestEntry entry) => entry.target == box);
     if (!found) {
       return false;
     }
@@ -413,24 +414,21 @@ class ElementHelper {
         }
       },
       timeout: timeout,
-      errorMessage:
-          "Element with locator ${element.by.describeMatch(Plurality.one)} not visible",
+      errorMessage: "Element with locator ${element.by.describeMatch(Plurality.one)} not visible",
     );
   }
 
   static Future<void> waitForElementEnable(FlutterElement element) async {
     await waitFor(() async {
-      return bool.parse(await ElementHelper.getAttribute(
-          element, NATIVE_ELEMENT_ATTRIBUTES.enabled.name));
-    },
-        errorMessage:
-            "Element with locator ${element.by.describeMatch(Plurality.one)} not enabled");
+      return bool.parse(
+          await ElementHelper.getAttribute(element, NATIVE_ELEMENT_ATTRIBUTES.enabled.name));
+    }, errorMessage: "Element with locator ${element.by.describeMatch(Plurality.one)} not enabled");
   }
 
   static Future<void> waitForElementClickable(FlutterElement element) async {
     await waitFor(() async {
-      return bool.parse(await ElementHelper.getAttribute(
-          element, NATIVE_ELEMENT_ATTRIBUTES.clickable.name));
+      return bool.parse(
+          await ElementHelper.getAttribute(element, NATIVE_ELEMENT_ATTRIBUTES.clickable.name));
     },
         errorMessage:
             "Element with locator ${element.by.describeMatch(Plurality.one)} not clickable");
@@ -463,14 +461,11 @@ class ElementHelper {
       final String sourceElementId = model.source.id;
       final String targetElementId = model.target.id;
       Session session = FlutterDriver.instance.getSessionOrThrow()!;
-      FlutterElement sourceEl =
-          await session.elementsCache.get(sourceElementId);
-      FlutterElement targetEl =
-          await session.elementsCache.get(targetElementId);
+      FlutterElement sourceEl = await session.elementsCache.get(sourceElementId);
+      FlutterElement targetEl = await session.elementsCache.get(targetElementId);
       final Offset sourceElementLocation = tester.getCenter(sourceEl.by);
       final Offset targetElementLocation = tester.getCenter(targetEl.by);
-      final TestGesture gesture =
-          await tester.startGesture(sourceElementLocation, pointer: 7);
+      final TestGesture gesture = await tester.startGesture(sourceElementLocation, pointer: 7);
       await gesture.moveTo(targetElementLocation);
       await tester.pump();
       await gesture.up();
@@ -487,25 +482,21 @@ class ElementHelper {
     Duration? settleBetweenScrollsTimeout,
     Duration? dragDuration,
   }) async {
-    delta ??= FlutterDriver.instance.settings
-        .getSetting(FlutterSettings.flutterScrollDelta);
-    maxScrolls ??= FlutterDriver.instance.settings
-        .getSetting(FlutterSettings.flutterScrollMaxIteration);
+    delta ??= FlutterDriver.instance.settings.getSetting(FlutterSettings.flutterScrollDelta);
+    maxScrolls ??=
+        FlutterDriver.instance.settings.getSetting(FlutterSettings.flutterScrollMaxIteration);
     WidgetTester tester = _getTester();
-    Finder scrollViewElement = scrollView != null
-        ? await locateElement(scrollView)
-        : find.byType(Scrollable);
+    Finder scrollViewElement =
+        scrollView != null ? await locateElement(scrollView) : find.byType(Scrollable);
     Finder elementToFind = await locateElement(finder, evaluatePresence: false);
 
     await waitForElementExist(FlutterElement.fromBy(scrollViewElement),
         timeout: Duration(
-            milliseconds: FlutterDriver.instance.settings
-                .getSetting('flutterElementWaitTimeout')));
+            milliseconds: FlutterDriver.instance.settings.getSetting('flutterElementWaitTimeout')));
     AxisDirection direction;
     if (scrollDirection == null) {
       if (scrollViewElement.evaluate().first.widget is Scrollable) {
-        direction =
-            tester.firstWidget<Scrollable>(scrollViewElement).axisDirection;
+        direction = tester.firstWidget<Scrollable>(scrollViewElement).axisDirection;
       } else {
         direction = AxisDirection.down;
       }
@@ -531,8 +522,7 @@ class ElementHelper {
       settleBetweenScrollsTimeout ??= const Duration(seconds: 5);
 
       var iterationsLeft = maxScrolls!;
-      while (iterationsLeft > 0 &&
-          elementToFind.hitTestable().evaluate().isEmpty) {
+      while (iterationsLeft > 0 && elementToFind.hitTestable().evaluate().isEmpty) {
         await tester.timedDrag(
           scrollViewElement,
           moveStep,
@@ -555,20 +545,22 @@ class ElementHelper {
     EnginePhase phase = EnginePhase.sendSemanticsUpdate,
     Duration timeout = const Duration(milliseconds: 200),
   }) async {
-    try {
-      WidgetTester tester = _getTester();
-      await tester.pumpAndSettle(
-        duration,
-        phase,
-        timeout,
-      );
-    } on FlutterError catch (err) {
-      if (err.message == 'pumpAndSettle timed out') {
-        //This method ignores pumpAndSettle timeouts on purpose
-      } else {
-        rethrow;
+    return TestAsyncUtils.guard(() async {
+      try {
+        WidgetTester tester = _getTester();
+        await tester.pumpAndSettle(
+          duration,
+          phase,
+          timeout,
+        );
+      } on FlutterError catch (err) {
+        if (err.message == 'pumpAndSettle timed out') {
+          //This method ignores pumpAndSettle timeouts on purpose
+        } else {
+          rethrow;
+        }
       }
-    }
+    });
   }
 
   static Future<Map<String, dynamic>> _serializeElement(
@@ -583,54 +575,55 @@ class ElementHelper {
     String? text,
     String? key,
   }) async {
-    final tester = _getTester();
-    final rootElement = tester.binding.rootElement;
+    return TestAsyncUtils.guard(() async {
+      final tester = _getTester();
+      final rootElement = tester.binding.rootElement;
 
-    if ((widgetType == null || widgetType.isEmpty) && rootElement != null) {
-      return [await _serializeElement(rootElement)];
-    }
-    if (rootElement == null) {
-      return [];
-    }
+      if ((widgetType == null || widgetType.isEmpty) && rootElement != null) {
+        return [await _serializeElement(rootElement)];
+      }
+      if (rootElement == null) {
+        return [];
+      }
 
-    final matchedElements = <Element>[];
+      final matchedElements = <Element>[];
 
-    Future<void> search(Element element) async {
-      final widget = element.widget;
-      final typeMatches = widget.runtimeType.toString() == widgetType;
-      final keyMatches =
-          key == null || widget.key?.toString().contains(key) == true;
-      bool textMatches = text == null;
-      if (text != null &&
-          (widget is Text ||
-              widget is RichText ||
-              widget is EditableText ||
-              widget is TextField)) {
-        try {
-          final flutterElement = FlutterElement.fromBy(find.byWidget(widget));
-          final elementText = await ElementHelper.getText(flutterElement);
-          textMatches = elementText == text;
-        } catch (_) {
-          textMatches = false;
+      Future<void> search(Element element) async {
+        final widget = element.widget;
+        final typeMatches = widget.runtimeType.toString() == widgetType;
+        final keyMatches = key == null || widget.key?.toString().contains(key) == true;
+        bool textMatches = text == null;
+        if (text != null &&
+            (widget is Text ||
+                widget is RichText ||
+                widget is EditableText ||
+                widget is TextField)) {
+          try {
+            final flutterElement = FlutterElement.fromBy(find.byWidget(widget));
+            final elementText = await ElementHelper.getText(flutterElement);
+            textMatches = elementText == text;
+          } catch (_) {
+            textMatches = false;
+          }
         }
+
+        if (typeMatches && keyMatches && textMatches) {
+          matchedElements.add(element);
+        }
+
+        element.visitChildren(search);
       }
 
-      if (typeMatches && keyMatches && textMatches) {
-        matchedElements.add(element);
+      await search(rootElement);
+      if (matchedElements.isEmpty) {
+        return [];
       }
+      final results = <Map<String, dynamic>>[];
 
-      element.visitChildren(search);
-    }
-
-    await search(rootElement);
-    if (matchedElements.isEmpty) {
-      return [];
-    }
-    final results = <Map<String, dynamic>>[];
-
-    for (final element in matchedElements) {
-      results.add(await _serializeElement(element));
-    }
-    return results;
+      for (final element in matchedElements) {
+        results.add(await _serializeElement(element));
+      }
+      return results;
+    });
   }
 }

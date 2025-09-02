@@ -4,7 +4,6 @@ import 'package:appium_flutter_server/src/driver.dart';
 import 'package:appium_flutter_server/src/handler/request/request_handler.dart';
 import 'package:appium_flutter_server/src/logger.dart';
 import 'package:appium_flutter_server/src/models/api/appium_response.dart';
-import 'package:integration_test/integration_test.dart';
 import 'package:shelf_plus/shelf_plus.dart';
 
 class ScreenshotHandler extends RequestHandler {
@@ -14,7 +13,7 @@ class ScreenshotHandler extends RequestHandler {
   Future<AppiumResponse> handle(Request request) async {
     try {
       log("Inside handler");
-      var binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+      var binding = FlutterDriver.instance.binding;
       var tester = FlutterDriver.instance.tester;
       await binding.convertFlutterSurfaceToImage();
       log("Converted to surface");
