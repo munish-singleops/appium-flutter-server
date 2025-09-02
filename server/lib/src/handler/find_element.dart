@@ -1,6 +1,7 @@
 import 'package:appium_flutter_server/src/driver.dart';
 import 'package:appium_flutter_server/src/handler/request/request_handler.dart';
 import 'package:appium_flutter_server/src/internal/flutter_element.dart';
+import 'package:appium_flutter_server/src/logger.dart';
 import 'package:appium_flutter_server/src/models/api/appium_response.dart';
 import 'package:appium_flutter_server/src/models/api/element.dart';
 import 'package:appium_flutter_server/src/models/api/find_element.dart';
@@ -13,19 +14,17 @@ class FindElementHandler extends RequestHandler {
 
   @override
   Future<AppiumResponse> handle(Request request) async {
-    FindElementModel model =
-        FindElementModel.fromJson(await request.body.asJson);
+    FindElementModel model = FindElementModel.fromJson(await request.body.asJson);
+
+    log("Finding element with timeout: ${model.timeout?.inMilliseconds ?? 'default'}ms");
 
     Finder matchedBy = await ElementHelper.locateElement(model);
 
     //await FlutterDriver.instance.tester.tap(matchedBy);
 
-    FlutterElement flutterElement = await FlutterDriver.instance
-        .getSessionOrThrow()!
-        .elementsCache
-        .add(matchedBy);
+    FlutterElement flutterElement =
+        await FlutterDriver.instance.getSessionOrThrow()!.elementsCache.add(matchedBy);
 
-    return AppiumResponse(
-        getSessionId(request), ElementModel.fromElement(flutterElement.id));
+    return AppiumResponse(getSessionId(request), ElementModel.fromElement(flutterElement.id));
   }
 }

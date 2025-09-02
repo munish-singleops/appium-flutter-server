@@ -23,14 +23,18 @@ enum NATIVE_ELEMENT_ATTRIBUTES { enabled, displayed, clickable }
 typedef WaitPredicate = Future<bool> Function();
 
 class ElementHelper {
-  static Future<Finder> findElement(Finder by, {String? contextId}) async {
-    List<Finder> elementList = await findElements(by, contextId: contextId, evaluatePresence: true);
+  static Future<Finder> findElement(Finder by, {String? contextId, Duration? timeout}) async {
+    List<Finder> elementList =
+        await findElements(by, contextId: contextId, evaluatePresence: true, timeout: timeout);
+    if (elementList.isEmpty) {
+      throw ElementNotFoundException("Unable to locate element");
+    }
     log("Element found ${elementList.first}");
     return elementList.first;
   }
 
   static Future<List<Finder>> findElements(Finder by,
-      {String? contextId, bool evaluatePresence = false}) async {
+      {String? contextId, bool evaluatePresence = false, Duration? timeout}) async {
     return TestAsyncUtils.guard(() async {
       Finder finder = by;
 
@@ -43,10 +47,12 @@ class ElementHelper {
       finder = finder.hitTestable();
       final FinderResult<Element> elements = finder.evaluate();
       if (evaluatePresence) {
-        await waitForElementExist(FlutterElement.fromBy(finder),
-            timeout: Duration(
+        final Duration waitTimeout = timeout ??
+            Duration(
                 milliseconds: FlutterDriver.instance.settings
-                    .getSetting(FlutterSettings.flutterElementWaitTimeout)));
+                    .getSetting(FlutterSettings.flutterElementWaitTimeout));
+
+        await waitForElementExist(FlutterElement.fromBy(finder), timeout: waitTimeout);
 
         if (elements.isEmpty) {
           throw ElementNotFoundException("Unable to locate element");
@@ -84,7 +90,7 @@ class ElementHelper {
 
       FlutterElement? element;
       if (elementId == null && doubleClickModel.locator != null) {
-        Finder by = await locateElement(doubleClickModel.locator!);
+        Finder by = await locateElement(doubleClickModel.locator!, evaluatePresence: true);
         element = FlutterElement.fromBy(by);
       } else if (elementId != null) {
         Session session = FlutterDriver.instance.getSessionOrThrow()!;
@@ -132,7 +138,7 @@ class ElementHelper {
 
       FlutterElement? element;
       if (elementId == null && longPressModel.locator != null) {
-        Finder by = await locateElement(longPressModel.locator!);
+        Finder by = await locateElement(longPressModel.locator!, evaluatePresence: true);
         element = FlutterElement.fromBy(by);
       } else if (elementId != null) {
         Session session = FlutterDriver.instance.getSessionOrThrow()!;
@@ -196,7 +202,11 @@ class ElementHelper {
         return buffer.toString();
       }
 
-      return getElementTextRecursively(element.by.evaluate().first);
+      final elements = element.by.evaluate();
+      if (elements.isEmpty) {
+        return '';
+      }
+      return getElementTextRecursively(elements.first);
     });
   }
 
@@ -213,12 +223,13 @@ class ElementHelper {
             FlutterDriver.instance.tester.widget(element.by).toDiagnosticsNode().getProperties();
         List<DiagnosticsNode> data = [];
         try {
-          data = FlutterDriver.instance.tester
+          final semanticsChildren = FlutterDriver.instance.tester
               .getSemantics(element.by)
               .toDiagnosticsNode()
-              .getChildren()
-              .first
-              .getProperties();
+              .getChildren();
+          if (semanticsChildren.isNotEmpty) {
+            data = semanticsChildren.first.getProperties();
+          }
           FlutterDriver.instance.tester
               .getSemantics(element.by)
               .getSemanticsData()
@@ -261,6 +272,7 @@ class ElementHelper {
     try {
       return FlutterDriver.instance.tester;
     } catch (e) {
+      log("Error getting tester: $e");
       throw FlutterAutomationException(
           "Test operations cannot be performed outside of test context. "
           "Ensure all operations are wrapped in TestAsyncUtils.guard()");
@@ -268,24 +280,29 @@ class ElementHelper {
   }
 
   static Future<Finder> locateElement(FindElementModel model,
-      {bool evaluatePresence = true}) async {
+      {bool evaluatePresence = true, Duration? customTimeout}) async {
     /// Support for backward compatibility
     final String method = model.strategy.startsWith("-flutter")
         ? model.strategy
         : '-flutter ${model.strategy.trim()}';
     final String selector = model.selector;
     final String? contextId = model.context == "" ? null : model.context;
+    final Duration timeout = customTimeout ??
+        model.timeout ??
+        Duration(
+            milliseconds: FlutterDriver.instance.settings
+                .getSetting(FlutterSettings.flutterElementWaitTimeout));
 
     if (contextId == null) {
-      log('"method: $method, selector: $selector');
+      log('"method: $method, selector: $selector, timeout: ${timeout.inMilliseconds}ms');
     } else {
-      log('"method: $method, selector: $selector, contextId: $contextId');
+      log('"method: $method, selector: $selector, contextId: $contextId, timeout: ${timeout.inMilliseconds}ms');
     }
 
     final Finder by =
         ElementLookupStrategy.values.firstWhere((val) => val.name == method).toFinder(selector);
     if (evaluatePresence) {
-      return await findElement(by, contextId: contextId);
+      return await findElement(by, contextId: contextId, timeout: timeout);
     } else {
       return by;
     }
@@ -294,26 +311,38 @@ class ElementHelper {
   static Rect getElementBounds(Finder by) {
     TestAsyncUtils.guardSync();
     var tester = _getTester();
-    return Rect.fromPoints(tester.getTopLeft(by), tester.getBottomRight(by));
+    try {
+      return Rect.fromPoints(tester.getTopLeft(by), tester.getBottomRight(by));
+    } catch (e) {
+      return Rect.zero;
+    }
   }
 
   static Size getElementSize(Finder by) {
     TestAsyncUtils.guardSync();
     var tester = _getTester();
-    return tester.getSize(by);
+    try {
+      return tester.getSize(by);
+    } catch (e) {
+      return Size.zero;
+    }
   }
 
   static String getElementName(Finder by) {
     TestAsyncUtils.guardSync();
     var tester = _getTester();
-    Element element = tester.element(by);
-    if (element is RenderObjectElement && element.renderObject.debugSemantics?.label != null) {
-      final String? semanticsLabel = element.renderObject.debugSemantics?.label;
-      if (semanticsLabel != null) {
-        return semanticsLabel.toString();
+    try {
+      Element element = tester.element(by);
+      if (element is RenderObjectElement && element.renderObject.debugSemantics?.label != null) {
+        final String? semanticsLabel = element.renderObject.debugSemantics?.label;
+        if (semanticsLabel != null) {
+          return semanticsLabel.toString();
+        }
       }
+      return element.widget.runtimeType.toString();
+    } catch (e) {
+      return 'Unknown Element';
     }
-    return element.widget.runtimeType.toString();
   }
 
   static DiagnosticsNode? _getElementPropertyNode(Finder by, String propertry) {
@@ -353,7 +382,14 @@ class ElementHelper {
     IntegrationTestWidgetsFlutterBinding binding = FlutterDriver.instance.binding;
 
     final Iterable<Element> elements = finder.evaluate();
-    final Element element = elements.single;
+    if (elements.isEmpty) {
+      log('The finder "$finder" found no elements');
+      return false;
+    }
+    if (elements.length > 1) {
+      log('The finder "$finder" found multiple elements (${elements.length}), using the first one');
+    }
+    final Element element = elements.first;
     final RenderObject? renderObject = element.renderObject;
     if (renderObject == null) {
       log('The finder "$finder"  found an element, but it does not have a corresponding render object. '
@@ -426,18 +462,32 @@ class ElementHelper {
     );
   }
 
-  static Future<void> waitForElementEnable(FlutterElement element) async {
+  static Future<void> waitForElementEnable(FlutterElement element, {Duration? timeout}) async {
+    final Duration waitTimeout = timeout ??
+        Duration(
+            milliseconds: FlutterDriver.instance.settings
+                .getSetting(FlutterSettings.flutterElementWaitTimeout));
+
     await waitFor(() async {
       return bool.parse(
           await ElementHelper.getAttribute(element, NATIVE_ELEMENT_ATTRIBUTES.enabled.name));
-    }, errorMessage: "Element with locator ${element.by.describeMatch(Plurality.one)} not enabled");
+    },
+        timeout: waitTimeout,
+        errorMessage:
+            "Element with locator ${element.by.describeMatch(Plurality.one)} not enabled");
   }
 
-  static Future<void> waitForElementClickable(FlutterElement element) async {
+  static Future<void> waitForElementClickable(FlutterElement element, {Duration? timeout}) async {
+    final Duration waitTimeout = timeout ??
+        Duration(
+            milliseconds: FlutterDriver.instance.settings
+                .getSetting(FlutterSettings.flutterElementWaitTimeout));
+
     await waitFor(() async {
       return bool.parse(
           await ElementHelper.getAttribute(element, NATIVE_ELEMENT_ATTRIBUTES.clickable.name));
     },
+        timeout: waitTimeout,
         errorMessage:
             "Element with locator ${element.by.describeMatch(Plurality.one)} not clickable");
   }
@@ -496,8 +546,9 @@ class ElementHelper {
     maxScrolls ??=
         FlutterDriver.instance.settings.getSetting(FlutterSettings.flutterScrollMaxIteration);
     WidgetTester tester = _getTester();
-    Finder scrollViewElement =
-        scrollView != null ? await locateElement(scrollView) : find.byType(Scrollable);
+    Finder scrollViewElement = scrollView != null
+        ? await locateElement(scrollView, evaluatePresence: true)
+        : find.byType(Scrollable);
     Finder elementToFind = await locateElement(finder, evaluatePresence: false);
 
     await waitForElementExist(FlutterElement.fromBy(scrollViewElement),
@@ -506,7 +557,8 @@ class ElementHelper {
     AxisDirection direction;
     if (scrollDirection == null) {
       TestAsyncUtils.guardSync();
-      if (scrollViewElement.evaluate().first.widget is Scrollable) {
+      final elements = scrollViewElement.evaluate();
+      if (elements.isNotEmpty && elements.first.widget is Scrollable) {
         direction = tester.firstWidget<Scrollable>(scrollViewElement).axisDirection;
       } else {
         direction = AxisDirection.down;
@@ -528,7 +580,11 @@ class ElementHelper {
           moveStep = Offset(-delta!, 0);
       }
 
-      scrollViewElement = scrollViewElement.hitTestable().first;
+      final hitTestableElements = scrollViewElement.hitTestable().evaluate();
+      if (hitTestableElements.isEmpty) {
+        throw FlutterAutomationException("No hit testable scroll view elements found");
+      }
+      scrollViewElement = find.byWidget(hitTestableElements.first.widget);
       dragDuration ??= const Duration(milliseconds: 100);
       settleBetweenScrollsTimeout ??= const Duration(seconds: 5);
 

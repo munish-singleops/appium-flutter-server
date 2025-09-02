@@ -16,18 +16,18 @@ class FindElementstHandler extends RequestHandler {
 
   @override
   Future<AppiumResponse> handle(Request request) async {
-    FindElementModel model =
-        FindElementModel.fromJson(await request.body.asJson);
+    FindElementModel model = FindElementModel.fromJson(await request.body.asJson);
 
     final String? contextId = model.context == "" ? null : model.context;
 
+    log("Finding elements with timeout: ${model.timeout?.inMilliseconds ?? 'default'}ms");
+
     Session? session = FlutterDriver.instance.getSessionOrThrow();
-    final Finder by =
-        await ElementHelper.locateElement(model, evaluatePresence: false);
+    final Finder by = await ElementHelper.locateElement(model, evaluatePresence: false);
     List<Finder> matchedByList = [];
     try {
       matchedByList =
-          await ElementHelper.findElements(by, contextId: contextId);
+          await ElementHelper.findElements(by, contextId: contextId, timeout: model.timeout);
     } on ElementNotFoundException catch (e) {
       log("Got an exception while looking for multiple matches using method: ${model.strategy}, selector: ${model.selector}");
       log(e);

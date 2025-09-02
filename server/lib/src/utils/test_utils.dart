@@ -18,7 +18,11 @@ String generateUUID() {
 String generateUUIDFromFinder(Finder by) {
   try {
     TestAsyncUtils.guardSync();
-    int hashCode = by.evaluate().first.widget.hashCode;
+    final elements = by.evaluate();
+    if (elements.isEmpty) {
+      return generateUUID();
+    }
+    int hashCode = elements.first.widget.hashCode;
     String hexString = hashCode.toRadixString(16);
 
     while (hexString.length < 32) {

@@ -22,10 +22,9 @@ abstract class BaseWaithHandler extends RequestHandler {
     }
     if (model.locator != null) {
       Finder finder = await ElementHelper.locateElement(model.locator!,
-          evaluatePresence: false);
+          evaluatePresence: false, customTimeout: model.timeout);
       return FlutterElement.fromBy(finder);
     }
-    throw FlutterAutomationException(
-        "Wait method requires a valid element id or locator strategy");
+    throw FlutterAutomationException("Wait method requires a valid element id or locator strategy");
   }
 }
