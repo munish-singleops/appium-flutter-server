@@ -4,6 +4,7 @@ import 'package:appium_flutter_server/src/driver.dart';
 import 'package:appium_flutter_server/src/handler/request/request_handler.dart';
 import 'package:appium_flutter_server/src/logger.dart';
 import 'package:appium_flutter_server/src/models/api/appium_response.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:shelf_plus/shelf_plus.dart';
 
 class ScreenshotHandler extends RequestHandler {
@@ -17,6 +18,7 @@ class ScreenshotHandler extends RequestHandler {
       var tester = FlutterDriver.instance.tester;
       await binding.convertFlutterSurfaceToImage();
       log("Converted to surface");
+      TestAsyncUtils.guardSync();
       await tester.pumpAndSettle();
       var data = await binding.takeScreenshot("screenshot");
       return AppiumResponse("NO_ID", base64Encode(data));

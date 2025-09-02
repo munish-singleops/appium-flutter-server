@@ -45,6 +45,7 @@ class ElementHelper {
         finder = find.descendant(of: parent.by, matching: by);
       }
       finder = finder.hitTestable();
+      TestAsyncUtils.guardSync();
       final FinderResult<Element> elements = finder.evaluate();
       if (evaluatePresence) {
         final Duration waitTimeout = timeout ??
@@ -79,7 +80,7 @@ class ElementHelper {
     return TestAsyncUtils.guard(() async {
       WidgetTester tester = _getTester();
       await tester.enterText(element.by, text);
-      await tester.pump(const Duration(milliseconds: 400));
+      await pumpAndTrySettle();
     });
   }
 
@@ -103,6 +104,7 @@ class ElementHelper {
               "if element is not set");
         }
 
+        TestAsyncUtils.guardSync();
         await tester.tapAt(Offset(doubleClickModel.offset!.x, doubleClickModel.offset!.y));
       } else {
         if (doubleClickModel.offset == null) {
@@ -112,6 +114,7 @@ class ElementHelper {
           log("Click by offset $bounds");
           await tester.tapAt(Offset(
               bounds.left + doubleClickModel.offset!.x, bounds.top + doubleClickModel.offset!.y));
+          TestAsyncUtils.guardSync();
           await tester.pump(kDoubleTapMinTime);
           await tester.tapAt(Offset(
               bounds.left + doubleClickModel.offset!.x, bounds.top + doubleClickModel.offset!.y));
@@ -125,6 +128,7 @@ class ElementHelper {
     return TestAsyncUtils.guard(() async {
       WidgetTester tester = _getTester();
       await tester.tap(element.by);
+      TestAsyncUtils.guardSync();
       await tester.pump(kDoubleTapMinTime);
       await tester.tap(element.by);
       await pumpAndTrySettle();
@@ -150,13 +154,16 @@ class ElementHelper {
               "if element is not set");
         }
 
+        TestAsyncUtils.guardSync();
         await tester.longPressAt(Offset(longPressModel.offset!.x, longPressModel.offset!.y));
       } else {
         if (longPressModel.offset == null) {
+          TestAsyncUtils.guardSync();
           await tester.longPress(element.by);
         } else {
           Rect bounds = getElementBounds(element.by);
           log("Click by offset $bounds");
+          TestAsyncUtils.guardSync();
           await tester.longPressAt(Offset(longPressModel.offset!.x, longPressModel.offset!.y));
           await pumpAndTrySettle();
         }
@@ -202,6 +209,7 @@ class ElementHelper {
         return buffer.toString();
       }
 
+      TestAsyncUtils.guardSync();
       final elements = element.by.evaluate();
       if (elements.isEmpty) {
         return '';
@@ -213,12 +221,14 @@ class ElementHelper {
   static Future<dynamic> getAttribute(FlutterElement element, String attribute) async {
     return TestAsyncUtils.guard(() async {
       if (NATIVE_ELEMENT_ATTRIBUTES.displayed.name == attribute) {
+        TestAsyncUtils.guardSync();
         return element.by.evaluate().isNotEmpty;
       } else if (NATIVE_ELEMENT_ATTRIBUTES.enabled.name == attribute) {
         return _isElementEnabled(element);
       } else if (NATIVE_ELEMENT_ATTRIBUTES.clickable.name == attribute) {
         return _isElementClickable(element);
       } else {
+        TestAsyncUtils.guardSync();
         List<DiagnosticsNode> nodes =
             FlutterDriver.instance.tester.widget(element.by).toDiagnosticsNode().getProperties();
         List<DiagnosticsNode> data = [];
@@ -403,6 +413,7 @@ class ElementHelper {
     }
     final RenderBox box = element.renderObject! as RenderBox;
     final Offset location = box.localToGlobal(box.size.center(Offset.zero));
+    TestAsyncUtils.guardSync();
     final FlutterView view = tester.viewOf(finder);
     final HitTestResult result = HitTestResult();
     binding.hitTestInView(result, location, view.viewId);
@@ -416,13 +427,12 @@ class ElementHelper {
   static Future<void> waitForElementExist(FlutterElement element,
       {required Duration timeout}) async {
     await waitFor(() async {
-      return TestAsyncUtils.guard(() async {
-        try {
-          return element.by.evaluate().isNotEmpty;
-        } catch (e) {
-          return false;
-        }
-      });
+      try {
+        TestAsyncUtils.guardSync();
+        return element.by.evaluate().isNotEmpty;
+      } catch (e) {
+        return false;
+      }
     },
         timeout: timeout,
         errorMessage:
@@ -432,13 +442,12 @@ class ElementHelper {
   static Future<void> waitForElementVisible(FlutterElement element,
       {required Duration timeout}) async {
     await waitFor(() async {
-      return TestAsyncUtils.guard(() async {
-        try {
-          return element.by.hitTestable().evaluate().isNotEmpty;
-        } catch (e) {
-          return false;
-        }
-      });
+      try {
+        TestAsyncUtils.guardSync();
+        return element.by.hitTestable().evaluate().isNotEmpty;
+      } catch (e) {
+        return false;
+      }
     },
         timeout: timeout,
         errorMessage:
@@ -449,13 +458,12 @@ class ElementHelper {
       {required Duration timeout}) async {
     await waitFor(
       () async {
-        return TestAsyncUtils.guard(() async {
-          try {
-            return element.by.evaluate().isEmpty;
-          } catch (e) {
-            return true;
-          }
-        });
+        try {
+          TestAsyncUtils.guardSync();
+          return element.by.evaluate().isEmpty;
+        } catch (e) {
+          return true;
+        }
       },
       timeout: timeout,
       errorMessage: "Element with locator ${element.by.describeMatch(Plurality.one)} not visible",
@@ -523,12 +531,15 @@ class ElementHelper {
       Session session = FlutterDriver.instance.getSessionOrThrow()!;
       FlutterElement sourceEl = await session.elementsCache.get(sourceElementId);
       FlutterElement targetEl = await session.elementsCache.get(targetElementId);
+      TestAsyncUtils.guardSync();
       final Offset sourceElementLocation = tester.getCenter(sourceEl.by);
       final Offset targetElementLocation = tester.getCenter(targetEl.by);
       final TestGesture gesture = await tester.startGesture(sourceElementLocation, pointer: 7);
       await gesture.moveTo(targetElementLocation);
+      TestAsyncUtils.guardSync();
       await tester.pump();
       await gesture.up();
+      TestAsyncUtils.guardSync();
       await tester.pump();
     });
   }
@@ -559,6 +570,7 @@ class ElementHelper {
       TestAsyncUtils.guardSync();
       final elements = scrollViewElement.evaluate();
       if (elements.isNotEmpty && elements.first.widget is Scrollable) {
+        TestAsyncUtils.guardSync();
         direction = tester.firstWidget<Scrollable>(scrollViewElement).axisDirection;
       } else {
         direction = AxisDirection.down;
@@ -580,6 +592,7 @@ class ElementHelper {
           moveStep = Offset(-delta!, 0);
       }
 
+      TestAsyncUtils.guardSync();
       final hitTestableElements = scrollViewElement.hitTestable().evaluate();
       if (hitTestableElements.isEmpty) {
         throw FlutterAutomationException("No hit testable scroll view elements found");
@@ -589,7 +602,12 @@ class ElementHelper {
       settleBetweenScrollsTimeout ??= const Duration(seconds: 5);
 
       var iterationsLeft = maxScrolls!;
-      while (iterationsLeft > 0 && elementToFind.hitTestable().evaluate().isEmpty) {
+      while (iterationsLeft > 0) {
+        TestAsyncUtils.guardSync();
+        if (elementToFind.hitTestable().evaluate().isNotEmpty) {
+          break;
+        }
+        TestAsyncUtils.guardSync();
         await tester.timedDrag(
           scrollViewElement,
           moveStep,
@@ -612,22 +630,20 @@ class ElementHelper {
     EnginePhase phase = EnginePhase.sendSemanticsUpdate,
     Duration timeout = const Duration(milliseconds: 200),
   }) async {
-    return TestAsyncUtils.guard(() async {
-      try {
-        WidgetTester tester = _getTester();
-        await tester.pumpAndSettle(
-          duration,
-          phase,
-          timeout,
-        );
-      } on FlutterError catch (err) {
-        if (err.message == 'pumpAndSettle timed out') {
-          //This method ignores pumpAndSettle timeouts on purpose
-        } else {
-          rethrow;
-        }
+    try {
+      WidgetTester tester = _getTester();
+      await tester.pumpAndSettle(
+        duration,
+        phase,
+        timeout,
+      );
+    } on FlutterError catch (err) {
+      if (err.message == 'pumpAndSettle timed out') {
+        //This method ignores pumpAndSettle timeouts on purpose
+      } else {
+        rethrow;
       }
-    });
+    }
   }
 
   static Future<Map<String, dynamic>> _serializeElement(
@@ -644,6 +660,7 @@ class ElementHelper {
   }) async {
     return TestAsyncUtils.guard(() async {
       final tester = _getTester();
+      TestAsyncUtils.guardSync();
       final rootElement = tester.binding.rootElement;
 
       if ((widgetType == null || widgetType.isEmpty) && rootElement != null) {
