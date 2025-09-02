@@ -23,28 +23,26 @@ class ElementsCache {
           element = await FlutterFinderStrategy.findElement(id);
         } catch (e) {
           log("Element $id not found in cache");
-          throw StaleElementReferenceException(
-              "The element '$id' does not exist in DOM anymore");
+          throw StaleElementReferenceException("The element '$id' does not exist in DOM anymore");
         }
       }
 
       if (evaluatePresence) {
+        TestAsyncUtils.guardSync();
         Iterable<Element> foundElement = element.by.evaluate();
 
         if (foundElement.isEmpty) {
-          throw StaleElementReferenceException(
-              "The element '$id' does not exist in DOM anymore");
+          throw StaleElementReferenceException("The element '$id' does not exist in DOM anymore");
         }
       }
       return element;
     });
   }
 
-  Future<FlutterElement> add(Finder by,
-      {bool isSingle = true, String? contextId}) {
+  Future<FlutterElement> add(Finder by, {bool isSingle = true, String? contextId}) {
     return synchronized(() {
-      FlutterElement flutterElement = FlutterElement.childElement(
-          by, generateUUIDFromFinder(by), contextId);
+      FlutterElement flutterElement =
+          FlutterElement.childElement(by, generateUUIDFromFinder(by), contextId);
       cache.put(flutterElement.id, flutterElement);
       return flutterElement;
     });

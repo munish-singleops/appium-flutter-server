@@ -31,32 +31,34 @@ class ElementHelper {
 
   static Future<List<Finder>> findElements(Finder by,
       {String? contextId, bool evaluatePresence = false}) async {
-    Finder finder = by;
+    return TestAsyncUtils.guard(() async {
+      Finder finder = by;
 
-    if (contextId != null) {
-      FlutterElement? parent =
-          await FlutterDriver.instance.getSessionOrThrow()!.elementsCache.get(contextId);
+      if (contextId != null) {
+        FlutterElement? parent =
+            await FlutterDriver.instance.getSessionOrThrow()!.elementsCache.get(contextId);
 
-      finder = find.descendant(of: parent.by, matching: by);
-    }
-    finder = finder.hitTestable();
-    final FinderResult<Element> elements = finder.evaluate();
-    if (evaluatePresence) {
-      await waitForElementExist(FlutterElement.fromBy(finder),
-          timeout: Duration(
-              milliseconds: FlutterDriver.instance.settings
-                  .getSetting(FlutterSettings.flutterElementWaitTimeout)));
-
-      if (elements.isEmpty) {
-        throw ElementNotFoundException("Unable to locate element");
+        finder = find.descendant(of: parent.by, matching: by);
       }
-    }
+      finder = finder.hitTestable();
+      final FinderResult<Element> elements = finder.evaluate();
+      if (evaluatePresence) {
+        await waitForElementExist(FlutterElement.fromBy(finder),
+            timeout: Duration(
+                milliseconds: FlutterDriver.instance.settings
+                    .getSetting(FlutterSettings.flutterElementWaitTimeout)));
 
-    List<Finder> elementList = [];
-    for (int i = 0; i < elements.length; i++) {
-      elementList.add(finder.at(i));
-    }
-    return elementList;
+        if (elements.isEmpty) {
+          throw ElementNotFoundException("Unable to locate element");
+        }
+      }
+
+      List<Finder> elementList = [];
+      for (int i = 0; i < elements.length; i++) {
+        elementList.add(finder.at(i));
+      }
+      return elementList;
+    });
   }
 
   static Future<void> click(FlutterElement element) async {
@@ -378,11 +380,13 @@ class ElementHelper {
   static Future<void> waitForElementExist(FlutterElement element,
       {required Duration timeout}) async {
     await waitFor(() async {
-      try {
-        return element.by.evaluate().isNotEmpty;
-      } catch (e) {
-        return false;
-      }
+      return TestAsyncUtils.guard(() async {
+        try {
+          return element.by.evaluate().isNotEmpty;
+        } catch (e) {
+          return false;
+        }
+      });
     },
         timeout: timeout,
         errorMessage:
@@ -392,11 +396,13 @@ class ElementHelper {
   static Future<void> waitForElementVisible(FlutterElement element,
       {required Duration timeout}) async {
     await waitFor(() async {
-      try {
-        return element.by.hitTestable().evaluate().isNotEmpty;
-      } catch (e) {
-        return false;
-      }
+      return TestAsyncUtils.guard(() async {
+        try {
+          return element.by.hitTestable().evaluate().isNotEmpty;
+        } catch (e) {
+          return false;
+        }
+      });
     },
         timeout: timeout,
         errorMessage:
@@ -407,11 +413,13 @@ class ElementHelper {
       {required Duration timeout}) async {
     await waitFor(
       () async {
-        try {
-          return element.by.evaluate().isEmpty;
-        } catch (e) {
-          return true;
-        }
+        return TestAsyncUtils.guard(() async {
+          try {
+            return element.by.evaluate().isEmpty;
+          } catch (e) {
+            return true;
+          }
+        });
       },
       timeout: timeout,
       errorMessage: "Element with locator ${element.by.describeMatch(Plurality.one)} not visible",
@@ -439,20 +447,22 @@ class ElementHelper {
     String? errorMessage,
     Duration timeout = const Duration(seconds: 20),
   }) async {
-    WidgetTester tester = FlutterDriver.instance.tester;
-    final end = tester.binding.clock.now().add(timeout);
+    return TestAsyncUtils.guard(() async {
+      WidgetTester tester = FlutterDriver.instance.tester;
+      final end = tester.binding.clock.now().add(timeout);
 
-    do {
-      if (tester.binding.clock.now().isAfter(end)) {
-        throw Exception(errorMessage != null
-            ? '$errorMessage with ${timeout.inSeconds} seconds'
-            : 'Timed out waiting for condition');
-      }
-      if (Platform.isAndroid) {
-        await pumpAndTrySettle(timeout: const Duration(milliseconds: 200));
-      }
-      await Future.delayed(const Duration(milliseconds: 100));
-    } while (!(await predicate()));
+      do {
+        if (tester.binding.clock.now().isAfter(end)) {
+          throw Exception(errorMessage != null
+              ? '$errorMessage with ${timeout.inSeconds} seconds'
+              : 'Timed out waiting for condition');
+        }
+        if (Platform.isAndroid) {
+          await pumpAndTrySettle(timeout: const Duration(milliseconds: 200));
+        }
+        await Future.delayed(const Duration(milliseconds: 100));
+      } while (!(await predicate()));
+    });
   }
 
   static Future<void> dragAndDrop(DragAndDropModel model) async {
@@ -495,6 +505,7 @@ class ElementHelper {
             milliseconds: FlutterDriver.instance.settings.getSetting('flutterElementWaitTimeout')));
     AxisDirection direction;
     if (scrollDirection == null) {
+      TestAsyncUtils.guardSync();
       if (scrollViewElement.evaluate().first.widget is Scrollable) {
         direction = tester.firstWidget<Scrollable>(scrollViewElement).axisDirection;
       } else {

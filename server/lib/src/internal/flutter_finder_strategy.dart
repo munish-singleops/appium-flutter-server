@@ -53,7 +53,12 @@ class FlutterFinderStrategy {
     }
 
     log("Finder By $by");
-    if (by == null || (ensureElementPresent && by.evaluate().isEmpty)) {
+    if (by == null ||
+        (ensureElementPresent &&
+            (() {
+              TestAsyncUtils.guardSync();
+              return by!.evaluate().isEmpty;
+            })())) {
       throw ElementNotFoundException(
           "Unable to locate element with strategy: ${strategy['finderType']}");
     }
@@ -99,14 +104,11 @@ class FlutterFinderStrategy {
   static Future<Finder?> _byAncestor(Map<String, dynamic> strategy) async {
     if (strategy['of'] != null && strategy['matching'] != null) {
       var of = await _locateElement(jsonDecode(strategy['of']));
-      var matching = await _locateElement(jsonDecode(strategy["matching"]),
-          ensureElementPresent: false);
-      var matchRoot = strategy['matchRoot'] == null
-          ? false
-          : bool.parse(strategy['matchRoot']);
+      var matching =
+          await _locateElement(jsonDecode(strategy["matching"]), ensureElementPresent: false);
+      var matchRoot = strategy['matchRoot'] == null ? false : bool.parse(strategy['matchRoot']);
 
-      return find.ancestor(
-          of: of.by, matching: matching.by, matchRoot: matchRoot);
+      return find.ancestor(of: of.by, matching: matching.by, matchRoot: matchRoot);
     }
     return null;
   }
@@ -114,14 +116,11 @@ class FlutterFinderStrategy {
   static Future<Finder?> _byDescendant(Map<String, dynamic> strategy) async {
     if (strategy['of'] != null && strategy['matching'] != null) {
       var of = await _locateElement(jsonDecode(strategy['of']));
-      var matching = await _locateElement(jsonDecode(strategy["matching"]),
-          ensureElementPresent: false);
-      var matchRoot = strategy['matchRoot'] == null
-          ? false
-          : bool.parse(strategy['matchRoot']);
+      var matching =
+          await _locateElement(jsonDecode(strategy["matching"]), ensureElementPresent: false);
+      var matchRoot = strategy['matchRoot'] == null ? false : bool.parse(strategy['matchRoot']);
 
-      return find.descendant(
-          of: of.by, matching: matching.by, matchRoot: matchRoot);
+      return find.descendant(of: of.by, matching: matching.by, matchRoot: matchRoot);
     }
     return null;
   }

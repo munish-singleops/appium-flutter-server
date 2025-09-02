@@ -11,13 +11,13 @@ String generateUUID() {
   var values = List<int>.generate(16, (index) => random.nextInt(256));
   values[6] = (values[6] & 0x0F) | 0x40; // version 4
   values[8] = (values[8] & 0x3F) | 0x80; // variant 2
-  var uuid =
-      values.map((value) => value.toRadixString(16).padLeft(2, '0')).join('');
+  var uuid = values.map((value) => value.toRadixString(16).padLeft(2, '0')).join('');
   return '${uuid.substring(0, 8)}-${uuid.substring(8, 12)}-${uuid.substring(12, 16)}-${uuid.substring(16, 20)}-${uuid.substring(20, 32)}';
 }
 
 String generateUUIDFromFinder(Finder by) {
   try {
+    TestAsyncUtils.guardSync();
     int hashCode = by.evaluate().first.widget.hashCode;
     String hexString = hashCode.toRadixString(16);
 
