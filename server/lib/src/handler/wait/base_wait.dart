@@ -8,8 +8,6 @@ import 'package:appium_flutter_server/src/utils/element_helper.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 abstract class BaseWaithHandler extends RequestHandler {
-  static const Duration defaultWaitTimeout = Duration(seconds: 5);
-
   BaseWaithHandler(super.route);
 
   Future<FlutterElement> resolveElement(WaitModel model) async {

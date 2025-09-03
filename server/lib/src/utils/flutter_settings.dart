@@ -21,7 +21,9 @@ class FlutterSettings {
     // Else the capability is not known to flutter server and ignore
     capabilities.forEach((settingName, value) {
       if (_settings[settingName] != null) {
+        final oldValue = _settings[settingName];
         _settings[settingName] = value;
+        print('FlutterSettings: Updated $settingName from $oldValue to $value');
       }
     });
   }

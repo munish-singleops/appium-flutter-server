@@ -4,6 +4,7 @@ import 'package:appium_flutter_server/src/internal/flutter_element.dart';
 import 'package:appium_flutter_server/src/models/api/appium_response.dart';
 import 'package:appium_flutter_server/src/models/api/wait.dart';
 import 'package:appium_flutter_server/src/utils/element_helper.dart';
+import 'package:appium_flutter_server/src/utils/flutter_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:shelf_plus/shelf_plus.dart';
@@ -18,7 +19,10 @@ class WaitForVisibleHandler extends BaseWaithHandler {
     FlutterElement element = await resolveElement(model);
 
     await ElementHelper.waitForElementVisible(element,
-        timeout: model.timeout ?? BaseWaithHandler.defaultWaitTimeout);
+        timeout: model.timeout ??
+            Duration(
+                milliseconds: FlutterDriver.instance.settings
+                    .getSetting(FlutterSettings.flutterElementWaitTimeout)));
 
     return AppiumResponse(getSessionId(request), null);
   }

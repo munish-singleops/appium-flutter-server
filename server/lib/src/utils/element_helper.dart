@@ -45,8 +45,7 @@ class ElementHelper {
         finder = find.descendant(of: parent.by, matching: by);
       }
       finder = finder.hitTestable();
-      TestAsyncUtils.guardSync();
-      final FinderResult<Element> elements = finder.evaluate();
+
       if (evaluatePresence) {
         final Duration waitTimeout = timeout ??
             Duration(
@@ -54,10 +53,12 @@ class ElementHelper {
                     .getSetting(FlutterSettings.flutterElementWaitTimeout));
 
         await waitForElementExist(FlutterElement.fromBy(finder), timeout: waitTimeout);
+      }
 
-        if (elements.isEmpty) {
-          throw ElementNotFoundException("Unable to locate element");
-        }
+      // Re-evaluate elements after waiting (if evaluatePresence was true)
+      final FinderResult<Element> elements = finder.evaluate();
+      if (evaluatePresence && elements.isEmpty) {
+        throw ElementNotFoundException("Unable to locate element");
       }
 
       List<Finder> elementList = [];
@@ -80,6 +81,7 @@ class ElementHelper {
     return TestAsyncUtils.guard(() async {
       WidgetTester tester = _getTester();
       await tester.enterText(element.by, text);
+      await pumpAndTrySettle();
     });
   }
 
@@ -103,7 +105,6 @@ class ElementHelper {
               "if element is not set");
         }
 
-        TestAsyncUtils.guardSync();
         await tester.tapAt(Offset(doubleClickModel.offset!.x, doubleClickModel.offset!.y));
       } else {
         if (doubleClickModel.offset == null) {
@@ -113,7 +114,6 @@ class ElementHelper {
           log("Click by offset $bounds");
           await tester.tapAt(Offset(
               bounds.left + doubleClickModel.offset!.x, bounds.top + doubleClickModel.offset!.y));
-          TestAsyncUtils.guardSync();
           await tester.pump(kDoubleTapMinTime);
           await tester.tapAt(Offset(
               bounds.left + doubleClickModel.offset!.x, bounds.top + doubleClickModel.offset!.y));
@@ -127,7 +127,6 @@ class ElementHelper {
     return TestAsyncUtils.guard(() async {
       WidgetTester tester = _getTester();
       await tester.tap(element.by);
-      TestAsyncUtils.guardSync();
       await tester.pump(kDoubleTapMinTime);
       await tester.tap(element.by);
       await pumpAndTrySettle();
@@ -157,12 +156,10 @@ class ElementHelper {
         await tester.longPressAt(Offset(longPressModel.offset!.x, longPressModel.offset!.y));
       } else {
         if (longPressModel.offset == null) {
-          TestAsyncUtils.guardSync();
           await tester.longPress(element.by);
         } else {
           Rect bounds = getElementBounds(element.by);
           log("Click by offset $bounds");
-          TestAsyncUtils.guardSync();
           await tester.longPressAt(Offset(longPressModel.offset!.x, longPressModel.offset!.y));
           await pumpAndTrySettle();
         }
@@ -220,14 +217,12 @@ class ElementHelper {
   static Future<dynamic> getAttribute(FlutterElement element, String attribute) async {
     return TestAsyncUtils.guard(() async {
       if (NATIVE_ELEMENT_ATTRIBUTES.displayed.name == attribute) {
-        TestAsyncUtils.guardSync();
         return element.by.evaluate().isNotEmpty;
       } else if (NATIVE_ELEMENT_ATTRIBUTES.enabled.name == attribute) {
         return _isElementEnabled(element);
       } else if (NATIVE_ELEMENT_ATTRIBUTES.clickable.name == attribute) {
         return _isElementClickable(element);
       } else {
-        TestAsyncUtils.guardSync();
         List<DiagnosticsNode> nodes =
             FlutterDriver.instance.tester.widget(element.by).toDiagnosticsNode().getProperties();
         List<DiagnosticsNode> data = [];
@@ -267,7 +262,13 @@ class ElementHelper {
             }
             return values;
           } else {
-            return data.firstWhere((node) => node.name == attribute).value.toString();
+            final matchingNode = data.where((node) => node.name == attribute).firstOrNull;
+            if (matchingNode != null) {
+              return matchingNode.value.toString();
+            } else {
+              log("Attribute '$attribute' not found in element properties");
+              return null;
+            }
           }
         } catch (err) {
           log(err);
@@ -427,7 +428,6 @@ class ElementHelper {
       {required Duration timeout}) async {
     await waitFor(() async {
       try {
-        TestAsyncUtils.guardSync();
         return element.by.evaluate().isNotEmpty;
       } catch (e) {
         return false;
@@ -435,14 +435,13 @@ class ElementHelper {
     },
         timeout: timeout,
         errorMessage:
-            "Element with locator ${element.by.describeMatch(Plurality.one)} is not present in DOM");
+            "Element with locator ${element.by.describeMatch(Plurality.one)} is not present in DOM after ${timeout.inSeconds} seconds");
   }
 
   static Future<void> waitForElementVisible(FlutterElement element,
       {required Duration timeout}) async {
     await waitFor(() async {
       try {
-        TestAsyncUtils.guardSync();
         return element.by.hitTestable().evaluate().isNotEmpty;
       } catch (e) {
         return false;
@@ -450,7 +449,7 @@ class ElementHelper {
     },
         timeout: timeout,
         errorMessage:
-            "Element with locator ${element.by.describeMatch(Plurality.one)} is not visible");
+            "Element with locator ${element.by.describeMatch(Plurality.one)} is not visible after ${timeout.inSeconds} seconds");
   }
 
   static Future<void> waitForElementAbsent(FlutterElement element,
@@ -458,14 +457,14 @@ class ElementHelper {
     await waitFor(
       () async {
         try {
-          TestAsyncUtils.guardSync();
           return element.by.evaluate().isEmpty;
         } catch (e) {
           return true;
         }
       },
       timeout: timeout,
-      errorMessage: "Element with locator ${element.by.describeMatch(Plurality.one)} not visible",
+      errorMessage:
+          "Element with locator ${element.by.describeMatch(Plurality.one)} is still present after ${timeout.inSeconds} seconds",
     );
   }
 
@@ -481,7 +480,7 @@ class ElementHelper {
     },
         timeout: waitTimeout,
         errorMessage:
-            "Element with locator ${element.by.describeMatch(Plurality.one)} not enabled");
+            "Element with locator ${element.by.describeMatch(Plurality.one)} not enabled after ${waitTimeout.inSeconds} seconds");
   }
 
   static Future<void> waitForElementClickable(FlutterElement element, {Duration? timeout}) async {
@@ -496,7 +495,7 @@ class ElementHelper {
     },
         timeout: waitTimeout,
         errorMessage:
-            "Element with locator ${element.by.describeMatch(Plurality.one)} not clickable");
+            "Element with locator ${element.by.describeMatch(Plurality.one)} not clickable after ${waitTimeout.inSeconds} seconds");
   }
 
   static Future<void> waitFor(
@@ -510,9 +509,9 @@ class ElementHelper {
 
       do {
         if (tester.binding.clock.now().isAfter(end)) {
-          throw Exception(errorMessage != null
-              ? '$errorMessage with ${timeout.inSeconds} seconds'
-              : 'Timed out waiting for condition');
+          throw FlutterAutomationException(errorMessage != null
+              ? errorMessage
+              : 'Timed out waiting for condition after ${timeout.inSeconds} seconds');
         }
         if (Platform.isAndroid) {
           await pumpAndTrySettle(timeout: const Duration(milliseconds: 200));
@@ -564,8 +563,8 @@ class ElementHelper {
 
       await waitForElementExist(FlutterElement.fromBy(scrollViewElement),
           timeout: Duration(
-              milliseconds:
-                  FlutterDriver.instance.settings.getSetting('flutterElementWaitTimeout')));
+              milliseconds: FlutterDriver.instance.settings
+                  .getSetting(FlutterSettings.flutterElementWaitTimeout)));
       AxisDirection direction;
       if (scrollDirection == null) {
         TestAsyncUtils.guardSync();
@@ -617,7 +616,12 @@ class ElementHelper {
       }
 
       if (iterationsLeft <= 0) {
-        throw FlutterAutomationException("Wait timeout");
+        final totalScrollTime = maxScrolls! *
+            (dragDuration!.inMilliseconds + settleBetweenScrollsTimeout!.inMilliseconds);
+        throw FlutterAutomationException(
+            "Wait timeout: Element '${finder.selector}' not found after scrolling $maxScrolls times "
+            "(total time: ${totalScrollTime}ms). Try increasing maxScrolls, adjusting scroll parameters, "
+            "or check if the element exists in the scrollable area.");
       }
 
       return elementToFind;
