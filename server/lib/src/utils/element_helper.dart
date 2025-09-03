@@ -80,7 +80,6 @@ class ElementHelper {
     return TestAsyncUtils.guard(() async {
       WidgetTester tester = _getTester();
       await tester.enterText(element.by, text);
-      await pumpAndTrySettle();
     });
   }
 
@@ -553,33 +552,33 @@ class ElementHelper {
     Duration? settleBetweenScrollsTimeout,
     Duration? dragDuration,
   }) async {
-    delta ??= FlutterDriver.instance.settings.getSetting(FlutterSettings.flutterScrollDelta);
-    maxScrolls ??=
-        FlutterDriver.instance.settings.getSetting(FlutterSettings.flutterScrollMaxIteration);
-    WidgetTester tester = _getTester();
-    Finder scrollViewElement = scrollView != null
-        ? await locateElement(scrollView, evaluatePresence: true)
-        : find.byType(Scrollable);
-    Finder elementToFind = await locateElement(finder, evaluatePresence: false);
+    return TestAsyncUtils.guard(() async {
+      delta ??= FlutterDriver.instance.settings.getSetting(FlutterSettings.flutterScrollDelta);
+      maxScrolls ??=
+          FlutterDriver.instance.settings.getSetting(FlutterSettings.flutterScrollMaxIteration);
+      WidgetTester tester = _getTester();
+      Finder scrollViewElement = scrollView != null
+          ? await locateElement(scrollView, evaluatePresence: true)
+          : find.byType(Scrollable);
+      Finder elementToFind = await locateElement(finder, evaluatePresence: false);
 
-    await waitForElementExist(FlutterElement.fromBy(scrollViewElement),
-        timeout: Duration(
-            milliseconds: FlutterDriver.instance.settings.getSetting('flutterElementWaitTimeout')));
-    AxisDirection direction;
-    if (scrollDirection == null) {
-      TestAsyncUtils.guardSync();
-      final elements = scrollViewElement.evaluate();
-      if (elements.isNotEmpty && elements.first.widget is Scrollable) {
+      await waitForElementExist(FlutterElement.fromBy(scrollViewElement),
+          timeout: Duration(
+              milliseconds:
+                  FlutterDriver.instance.settings.getSetting('flutterElementWaitTimeout')));
+      AxisDirection direction;
+      if (scrollDirection == null) {
         TestAsyncUtils.guardSync();
-        direction = tester.firstWidget<Scrollable>(scrollViewElement).axisDirection;
+        final elements = scrollViewElement.evaluate();
+        if (elements.isNotEmpty && elements.first.widget is Scrollable) {
+          TestAsyncUtils.guardSync();
+          direction = tester.firstWidget<Scrollable>(scrollViewElement).axisDirection;
+        } else {
+          direction = AxisDirection.down;
+        }
       } else {
-        direction = AxisDirection.down;
+        direction = scrollDirection;
       }
-    } else {
-      direction = scrollDirection;
-    }
-
-    return TestAsyncUtils.guard<Finder>(() async {
       Offset moveStep;
       switch (direction) {
         case AxisDirection.up:
